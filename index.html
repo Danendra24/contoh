@@ -25,7 +25,8 @@
 
     <div id="modal-item" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
         <div class="bg-slate-900 border border-slate-700 w-full max-w-md p-8 rounded-2xl shadow-2xl">
-            <h3 class="text-xl font-bold mb-6 text-indigo-400">Add New Widget</h3>
+            <h3 id="widget-modal-title" class="text-xl font-bold mb-6 text-indigo-400">Add New Widget</h3>
+            <input type="hidden" id="edit-widget-id">
             <div class="space-y-4">
                 <div>
                     <label class="block text-[10px] uppercase font-bold text-slate-500 mb-2">Item Name</label>
@@ -65,7 +66,8 @@
 
     <div id="modal-project" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
         <div class="bg-slate-900 border border-slate-700 w-full max-w-sm p-8 rounded-2xl shadow-2xl">
-            <h3 class="text-xl font-bold mb-6 text-emerald-400">Create New Project</h3>
+            <h3 id="project-modal-title" class="text-xl font-bold mb-6 text-emerald-400">Create New Project</h3>
+            <input type="hidden" id="edit-project-id">
             <div class="space-y-4">
                 <div>
                     <label class="block text-[10px] uppercase font-bold text-slate-500 mb-2">Project Name</label>
@@ -74,7 +76,7 @@
             </div>
             <div class="flex space-x-3 mt-8">
                 <button onclick="closeProjectModal()" class="flex-1 px-4 py-3 rounded-xl bg-slate-800 text-sm font-semibold">Cancel</button>
-                <button onclick="saveProject()" class="flex-1 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition">Create</button>
+                <button id="btn-save-project" onclick="saveProject()" class="flex-1 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition">Create</button>
             </div>
         </div>
     </div>
@@ -84,8 +86,7 @@
         
         <div class="px-6 mb-6">
             <label class="text-[9px] uppercase font-black text-slate-600 tracking-[0.2em] mb-3 block">Selected Project</label>
-            <div id="project-list" class="space-y-2 max-h-40 overflow-y-auto mb-4">
-                </div>
+            <div id="project-list" class="space-y-2 max-h-40 overflow-y-auto mb-4"></div>
             <button onclick="openProjectModal()" class="w-full py-2 border border-dashed border-slate-700 rounded-xl text-[10px] font-bold text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50 transition">
                 <i class="fas fa-folder-plus mr-2"></i>New Project
             </button>
@@ -172,7 +173,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCDri3OmQNtdmZNb2fR9cu4KhFEA4kn29M",
@@ -187,19 +188,16 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // STATE MANAGEMENT
         window.widgets = [];
         window.projects = [];
         window.activeProjectId = null;
 
-        // FETCH PROJECTS
         onValue(ref(db, 'system_projects'), (snapshot) => {
             const data = snapshot.val();
             window.projects = data ? Object.values(data) : [];
             renderProjects();
         });
 
-        // FETCH WIDGETS
         onValue(ref(db, 'system_widgets'), (snapshot) => {
             const data = snapshot.val();
             window.widgets = data ? Object.values(data) : [];
@@ -207,16 +205,36 @@
         });
 
         // PROJECT LOGIC
-        window.openProjectModal = () => document.getElementById('modal-project').classList.remove('hidden');
+        window.openProjectModal = (id = null) => {
+            if(id) {
+                const proj = window.projects.find(p => p.id == id);
+                document.getElementById('project-modal-title').innerText = "Edit Project Name";
+                document.getElementById('edit-project-id').value = id;
+                document.getElementById('project-name-input').value = proj.name;
+                document.getElementById('btn-save-project').innerText = "Update Name";
+            } else {
+                document.getElementById('project-modal-title').innerText = "Create New Project";
+                document.getElementById('edit-project-id').value = '';
+                document.getElementById('project-name-input').value = '';
+                document.getElementById('btn-save-project').innerText = "Create";
+            }
+            document.getElementById('modal-project').classList.remove('hidden');
+        };
+
         window.closeProjectModal = () => document.getElementById('modal-project').classList.add('hidden');
         
         window.saveProject = () => {
             const name = document.getElementById('project-name-input').value;
+            const editId = document.getElementById('edit-project-id').value;
             if(!name) return alert("Nama project wajib diisi!");
-            const id = Date.now();
-            const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "_");
-            set(ref(db, 'system_projects/' + id), { id, name, slug });
-            document.getElementById('project-name-input').value = '';
+            
+            if(editId) {
+                update(ref(db, 'system_projects/' + editId), { name });
+            } else {
+                const id = Date.now();
+                const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+                set(ref(db, 'system_projects/' + id), { id, name, slug });
+            }
             closeProjectModal();
         };
 
@@ -224,12 +242,9 @@
             window.activeProjectId = id;
             const proj = window.projects.find(p => p.id == id);
             document.getElementById('active-project-name').innerText = "Active: " + proj.name;
-            
-            // Enable Button Create Widget
             const btn = document.getElementById('btn-create-widget');
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
-            
             renderProjects();
             renderAll();
         };
@@ -237,7 +252,6 @@
         window.deleteProject = (id) => {
             if(confirm("Hapus project ini dan SEMUA widget di dalamnya?")) {
                 remove(ref(db, 'system_projects/' + id));
-                // Hapus juga widget yang terkait
                 window.widgets.filter(w => w.projectId == id).forEach(w => {
                     remove(ref(db, 'system_widgets/' + w.id));
                 });
@@ -252,68 +266,70 @@
                 const isActive = window.activeProjectId == p.id;
                 container.innerHTML += `
                     <div onclick="selectProject(${p.id})" class="group flex items-center justify-between p-3 rounded-xl border border-slate-800 cursor-pointer transition ${isActive ? 'bg-indigo-600/20 border-indigo-500' : 'hover:bg-slate-900'}">
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-3 overflow-hidden">
                             <i class="fas fa-folder text-xs ${isActive ? 'text-indigo-400' : 'text-slate-600'}"></i>
-                            <span class="text-[11px] font-bold ${isActive ? 'text-white' : 'text-slate-400'}">${p.name}</span>
+                            <span class="text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-400'}">${p.name}</span>
                         </div>
-                        <button onclick="event.stopPropagation(); deleteProject(${p.id})" class="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-red-500 transition">
-                            <i class="fas fa-times text-[10px]"></i>
-                        </button>
+                        <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100">
+                            <button onclick="event.stopPropagation(); openProjectModal(${p.id})" class="text-slate-700 hover:text-emerald-500 transition">
+                                <i class="fas fa-edit text-[10px]"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); deleteProject(${p.id})" class="text-slate-700 hover:text-red-500 transition">
+                                <i class="fas fa-times text-[10px]"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             });
         }
 
-        // ORIGINAL WIDGET LOGIC (ADAPTED FOR PROJECT)
-        window.toggleSwitch = (slug, currentVal) => {
-            const proj = window.projects.find(p => p.id == window.activeProjectId);
-            set(ref(db, `data/${proj.slug}/${slug}`), currentVal == 1 ? 0 : 1);
-        };
-
-        window.pushButton = (slug, val) => {
-            const proj = window.projects.find(p => p.id == window.activeProjectId);
-            set(ref(db, `data/${proj.slug}/${slug}`), val);
-        };
-
-        window.toggleMinMax = () => {
-            const type = document.getElementById('item-type').value;
-            document.getElementById('min-max-container').style.display = (type === 'numeric_gauge') ? 'grid' : 'none';
-        };
-
-        window.openModal = () => {
+        // WIDGET LOGIC
+        window.openModal = (id = null) => {
             if(!window.activeProjectId) return alert("Pilih project dulu bro!");
+            
+            if(id) {
+                const w = window.widgets.find(item => item.id == id);
+                document.getElementById('widget-modal-title').innerText = "Edit Widget";
+                document.getElementById('edit-widget-id').value = id;
+                document.getElementById('item-name').value = w.name;
+                document.getElementById('item-type').value = w.type;
+                document.getElementById('item-min').value = w.min;
+                document.getElementById('item-max').value = w.max;
+                toggleMinMax();
+            } else {
+                document.getElementById('widget-modal-title').innerText = "Add New Widget";
+                document.getElementById('edit-widget-id').value = '';
+                document.getElementById('item-name').value = '';
+                document.getElementById('item-type').value = 'switch';
+                document.getElementById('item-min').value = 0;
+                document.getElementById('item-max').value = 100;
+                toggleMinMax();
+            }
             document.getElementById('modal-item').classList.remove('hidden');
         }
 
-        window.closeModal = () => {
-            document.getElementById('modal-item').classList.add('hidden');
-            document.getElementById('min-max-container').style.display = 'none';
-        };
+        window.closeModal = () => document.getElementById('modal-item').classList.add('hidden');
 
         window.saveItem = () => {
             const name = document.getElementById('item-name').value;
             const type = document.getElementById('item-type').value;
             const min = parseFloat(document.getElementById('item-min').value) || 0;
             const max = parseFloat(document.getElementById('item-max').value) || 100;
+            const editId = document.getElementById('edit-widget-id').value;
             
             if(!name) return alert("Beri nama dulu bro!");
-
-            const id = Date.now();
-            const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Math.floor(1000 + Math.random() * 9000);
             const proj = window.projects.find(p => p.id == window.activeProjectId);
-            
-            const newWidget = { 
-                id, 
-                projectId: window.activeProjectId, // Link to project
-                projectSlug: proj.slug,
-                name, type, min, max, slug 
-            };
-            
-            set(ref(db, 'system_widgets/' + id), newWidget);
-            set(ref(db, `data/${proj.slug}/${slug}`), 0); 
-            
+
+            if(editId) {
+                update(ref(db, 'system_widgets/' + editId), { name, type, min, max });
+            } else {
+                const id = Date.now();
+                const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Math.floor(1000 + Math.random() * 9000);
+                const newWidget = { id, projectId: window.activeProjectId, projectSlug: proj.slug, name, type, min, max, slug };
+                set(ref(db, 'system_widgets/' + id), newWidget);
+                set(ref(db, `data/${proj.slug}/${slug}`), 0); 
+            }
             closeModal();
-            document.getElementById('item-name').value = '';
         };
 
         window.deleteWidget = (id) => {
@@ -329,7 +345,6 @@
             monitorGrid.innerHTML = '';
             tableBody.innerHTML = '';
 
-            // Filter widgets based on active project
             const filteredWidgets = window.widgets.filter(w => w.projectId == window.activeProjectId);
             document.getElementById('widget-count').innerText = `${filteredWidgets.length} Widgets`;
 
@@ -337,13 +352,16 @@
                 const fullPath = `/data/${w.projectSlug}/${w.slug}`;
 
                 editorGrid.innerHTML += `
-                    <div class="bg-slate-800/30 border border-slate-700/50 p-6 rounded-2xl space-y-4 shadow-lg">
+                    <div class="bg-slate-800/30 border border-slate-700/50 p-6 rounded-2xl space-y-4 shadow-lg group">
                         <div class="flex justify-between items-start">
                             <div>
                                 <div class="text-[9px] text-indigo-400 font-bold uppercase tracking-[0.2em] mb-1">${w.type}</div>
                                 <div class="font-bold text-white">${w.name}</div>
                             </div>
-                            <button onclick="deleteWidget(${w.id})" class="text-slate-700 hover:text-red-500 transition"><i class="fas fa-trash-alt text-xs"></i></button>
+                            <div class="flex space-x-2">
+                                <button onclick="openModal(${w.id})" class="text-slate-700 hover:text-emerald-400 transition"><i class="fas fa-edit text-xs"></i></button>
+                                <button onclick="deleteWidget(${w.id})" class="text-slate-700 hover:text-red-500 transition"><i class="fas fa-trash-alt text-xs"></i></button>
+                            </div>
                         </div>
                         <div class="bg-slate-950/80 rounded-xl p-4 border border-slate-800">
                             <div class="text-[9px] text-slate-600 uppercase font-black mb-2 tracking-widest">ESP32 Path ID:</div>
@@ -372,7 +390,22 @@
             });
         };
 
-        // ORIGINAL UI CREATOR (NO CHANGES)
+        // UI HELPERS
+        window.toggleMinMax = () => {
+            const type = document.getElementById('item-type').value;
+            document.getElementById('min-max-container').style.display = (type === 'numeric_gauge') ? 'grid' : 'none';
+        };
+
+        window.toggleSwitch = (slug, currentVal) => {
+            const proj = window.projects.find(p => p.id == window.activeProjectId);
+            set(ref(db, `data/${proj.slug}/${slug}`), currentVal == 1 ? 0 : 1);
+        };
+
+        window.pushButton = (slug, val) => {
+            const proj = window.projects.find(p => p.id == window.activeProjectId);
+            set(ref(db, `data/${proj.slug}/${slug}`), val);
+        };
+
         function createMonitorUI(w, val) {
             let inner = '';
             if(w.type === 'switch') {

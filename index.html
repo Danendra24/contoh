@@ -8,10 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono&display=swap');
+        
         .sidebar-item.active { background: #1e293b; border-left: 4px solid #6366f1; color: white; }
         body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }
         code { font-family: 'JetBrains Mono', monospace; }
+        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
@@ -25,16 +27,20 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-[10px] uppercase font-bold text-slate-500 mb-2">Item Name</label>
-                    <input id="item-name" type="text" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500" placeholder="e.g. Temperature">
+                    <input id="item-name" type="text" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="e.g. Pump Switch / Temp Sensor">
                 </div>
                 <div>
-                    <label class="block text-[10px] uppercase font-bold text-slate-500 mb-2">Type</label>
-                    <select id="item-type" onchange="window.toggleMinMax()" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none">
-                        <option value="switch">Digital Switch</option>
-                        <option value="status">Status Indicator</option>
-                        <option value="numeric_gauge">Numeric Gauge (Full Circle)</option>
-                        <option value="numeric_simple">Numeric Simple Text</option>
-                    </option>
+                    <label class="block text-[10px] uppercase font-bold text-slate-500 mb-2">Category & Type</label>
+                    <select id="item-type" onchange="toggleMinMax()" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                        <optgroup label="Control (Output to ESP32)" class="bg-slate-900">
+                            <option value="switch">Digital Switch (ON/OFF)</option>
+                            <option value="button">Push Button (Trigger)</option>
+                        </optgroup>
+                        <optgroup label="Monitor (Input from ESP32)" class="bg-slate-900">
+                            <option value="status">Status Indicator (0 / 1)</option>
+                            <option value="numeric_gauge">Numeric Gauge (Circle)</option>
+                            <option value="numeric_simple">Numeric Simple Text</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div id="min-max-container" class="hidden grid grid-cols-2 gap-4">
@@ -49,8 +55,8 @@
                 </div>
             </div>
             <div class="flex space-x-3 mt-8">
-                <button onclick="window.closeModal()" class="flex-1 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold">Cancel</button>
-                <button onclick="window.saveItem()" class="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Save Widget</button>
+                <button onclick="closeModal()" class="flex-1 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold transition">Cancel</button>
+                <button onclick="saveItem()" class="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition">Save Widget</button>
             </div>
         </div>
     </div>
@@ -58,41 +64,78 @@
     <aside class="w-64 bg-slate-950 border-r border-slate-800 flex flex-col">
         <div class="p-8 text-2xl font-black tracking-tighter text-indigo-500 italic">UNI-DASH</div>
         <nav class="flex-1 px-4 space-y-2">
-            <button onclick="window.switchTab('editor')" id="btn-editor" class="sidebar-item active w-full flex items-center p-4 rounded-xl text-sm font-medium transition">
+            <button onclick="switchTab('editor')" id="btn-editor" class="sidebar-item active w-full flex items-center p-4 rounded-xl transition text-sm font-medium">
                 <i class="fas fa-tools w-6"></i><span class="ml-3">Dashboard Editor</span>
             </button>
-            <button onclick="window.switchTab('monitor')" id="btn-monitor" class="sidebar-item w-full flex items-center p-4 rounded-xl text-slate-500 text-sm font-medium transition">
+            <button onclick="switchTab('monitor')" id="btn-monitor" class="sidebar-item w-full flex items-center p-4 rounded-xl transition text-slate-500 text-sm font-medium">
                 <i class="fas fa-chart-line w-6"></i><span class="ml-3">Display & Control</span>
             </button>
-            <button onclick="window.switchTab('connection')" id="btn-connection" class="sidebar-item w-full flex items-center p-4 rounded-xl text-slate-500 border-t border-slate-800/50 mt-4 pt-6 text-sm font-medium transition">
+            <button onclick="switchTab('connection')" id="btn-connection" class="sidebar-item w-full flex items-center p-4 rounded-xl transition text-slate-500 border-t border-slate-800/50 mt-4 pt-6 text-sm font-medium">
                 <i class="fas fa-network-wired w-6"></i><span class="ml-3">System Connection</span>
             </button>
         </nav>
+        <div class="p-6 border-t border-slate-900 text-[10px] text-slate-600 font-mono text-center uppercase tracking-widest">
+            Hardware-to-Web Protocol v1.0
+        </div>
     </aside>
 
-    <main class="flex-1 flex flex-col overflow-y-auto">
+    <main class="flex-1 flex flex-col overflow-y-auto relative">
         <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 glass sticky top-0 z-10">
-            <h2 id="header-title" class="text-xs uppercase tracking-widest font-black text-slate-400">Dashboard Editor</h2>
-            <button onclick="window.openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg">
+            <h2 id="header-title" class="text-xs uppercase tracking-[0.2em] font-black text-slate-400">Dashboard Editor</h2>
+            <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-full text-[11px] font-black transition uppercase tracking-widest shadow-lg shadow-indigo-600/20">
                 <i class="fas fa-plus mr-2"></i> Create Widget
             </button>
         </header>
 
         <div class="p-10">
             <div id="section-editor" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
             <div id="section-monitor" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+
             <div id="section-connection" class="hidden max-w-3xl mx-auto space-y-8">
-                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-                   <h3 class="text-lg font-bold text-white mb-4 italic">Firebase Connection Recap</h3>
-                   <code class="block bg-black p-4 rounded text-emerald-400 text-[10px] mb-6 overflow-x-auto">Host: https://dashboardiot-7fd60-default-rtdb.asia-southeast1.firebasedatabase.app/</code>
-                   <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead class="text-[10px] text-slate-500 uppercase tracking-widest border-b border-slate-800">
-                                <tr><th class="py-3">Widget Name</th><th class="py-3">Range</th><th class="py-3">Firebase Path ID</th></tr>
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+                    <div class="bg-indigo-600 p-6 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-white italic">ESP32 Credentials</h3>
+                            <p class="text-indigo-200 text-[10px] uppercase tracking-wider font-bold">Firebase Configuration</p>
+                        </div>
+                        <i class="fas fa-shield-alt text-2xl text-white/20"></i>
+                    </div>
+                    <div class="p-8 space-y-6">
+                        <div>
+                            <label class="text-[9px] uppercase text-slate-500 font-bold tracking-widest mb-2 block">Database Host URL</label>
+                            <div class="flex items-center bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                                <code class="text-emerald-400 text-xs flex-1 truncate font-mono italic">https://dashboardiot-7fd60-default-rtdb.asia-southeast1.firebasedatabase.app/</code>
+                                <button onclick="copyToClipboard('https://dashboardiot-7fd60-default-rtdb.asia-southeast1.firebasedatabase.app/')" class="ml-4 text-slate-500 hover:text-white transition"><i class="far fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[9px] uppercase text-slate-500 font-bold tracking-widest mb-2 block">API Key / Secret</label>
+                            <div class="flex items-center bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                                <code class="text-emerald-400 text-xs flex-1 truncate font-mono italic">AIzaSyCDri3OmQNtdmZNb2fR9cu4KhFEA4kn29M</code>
+                                <button onclick="copyToClipboard('AIzaSyCDri3OmQNtdmZNb2fR9cu4KhFEA4kn29M')" class="ml-4 text-slate-500 hover:text-white transition"><i class="far fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                    <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Daftar Rekap Path ID</h4>
+                        <span id="widget-count" class="bg-slate-800 text-indigo-400 px-3 py-1 rounded-full text-[10px] font-bold">0 Widgets</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-[10px] text-slate-500 uppercase tracking-widest bg-slate-950/30">
+                                    <th class="px-6 py-4 font-black">Widget Name</th>
+                                    <th class="px-6 py-4 font-black">Type</th>
+                                    <th class="px-6 py-4 font-black text-emerald-500">Firebase Path ID</th>
+                                </tr>
                             </thead>
                             <tbody id="recap-table-body" class="text-[11px]"></tbody>
                         </table>
-                   </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -116,7 +159,18 @@
         const db = getDatabase(app);
         const widgetsRef = ref(db, 'system_widgets');
 
-        let localWidgets = [];
+        window.widgets = [];
+
+        onValue(widgetsRef, (snapshot) => {
+            const data = snapshot.val();
+            window.widgets = data ? Object.values(data) : [];
+            renderAll();
+        });
+
+        // HANYA INI YANG DITAMBAHKAN UNTUK LOGIKA SWITCH
+        window.toggleSwitch = (slug, currentVal) => {
+            set(ref(db, 'data/' + slug), currentVal == 1 ? 0 : 1);
+        };
 
         window.toggleMinMax = () => {
             const type = document.getElementById('item-type').value;
@@ -128,99 +182,140 @@
             document.getElementById('modal-item').classList.add('hidden');
             document.getElementById('min-max-container').style.display = 'none';
         };
-        
+
         window.saveItem = () => {
             const name = document.getElementById('item-name').value;
             const type = document.getElementById('item-type').value;
             const min = parseFloat(document.getElementById('item-min').value) || 0;
             const max = parseFloat(document.getElementById('item-max').value) || 100;
+            
+            if(!name) return alert("Beri nama dulu bro!");
 
-            if(!name) return alert("Isi nama dulu!");
             const id = Date.now();
-            const newWidget = { id, name, type, min, max, slug: name.toLowerCase().replace(/\s+/g, '_') + '_' + Math.floor(Math.random()*1000) };
+            const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Math.floor(1000 + Math.random() * 9000);
+            const newWidget = { id, name, type, min, max, slug };
+            
             set(ref(db, 'system_widgets/' + id), newWidget);
-            window.closeModal();
+            set(ref(db, 'data/' + slug), 0); // Initial data 0
+            
+            closeModal();
             document.getElementById('item-name').value = '';
         };
 
         window.deleteWidget = (id) => {
-            if(confirm("Hapus widget?")) remove(ref(db, 'system_widgets/' + id));
+            if(confirm("Hapus widget ini?")) remove(ref(db, 'system_widgets/' + id));
         };
 
+        window.renderAll = () => {
+            const editorGrid = document.getElementById('section-editor');
+            const monitorGrid = document.getElementById('section-monitor');
+            const tableBody = document.getElementById('recap-table-body');
+            
+            editorGrid.innerHTML = '';
+            monitorGrid.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            document.getElementById('widget-count').innerText = `${window.widgets.length} Widgets`;
+
+            window.widgets.forEach(w => {
+                const fullPath = `/data/${w.slug}`;
+
+                editorGrid.innerHTML += `
+                    <div class="bg-slate-800/30 border border-slate-700/50 p-6 rounded-2xl space-y-4 shadow-lg">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="text-[9px] text-indigo-400 font-bold uppercase tracking-[0.2em] mb-1">${w.type}</div>
+                                <div class="font-bold text-white">${w.name}</div>
+                            </div>
+                            <button onclick="deleteWidget(${w.id})" class="text-slate-700 hover:text-red-500 transition"><i class="fas fa-trash-alt text-xs"></i></button>
+                        </div>
+                        <div class="bg-slate-950/80 rounded-xl p-4 border border-slate-800">
+                            <div class="text-[9px] text-slate-600 uppercase font-black mb-2 tracking-widest">ESP32 Path ID:</div>
+                            <div class="flex items-center justify-between">
+                                <code class="text-xs text-emerald-500 font-mono truncate">${fullPath}</code>
+                                <button onclick="copyToClipboard('${fullPath}')" class="text-slate-600 hover:text-white ml-2"><i class="far fa-copy text-xs"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
+
+                const cardId = `monitor-${w.id}`;
+                monitorGrid.innerHTML += `<div id="${cardId}"></div>`;
+
+                onValue(ref(db, 'data/' + w.slug), (snapshot) => {
+                    const val = snapshot.val() || 0;
+                    const container = document.getElementById(cardId);
+                    if(container) container.innerHTML = createMonitorUI(w, val);
+                });
+
+                tableBody.innerHTML += `
+                    <tr class="border-t border-slate-800/50 hover:bg-slate-800/20 transition">
+                        <td class="px-6 py-4 font-bold text-slate-300">${w.name}</td>
+                        <td class="px-6 py-4 text-slate-500 uppercase text-[9px] font-bold">${w.type}</td>
+                        <td class="px-6 py-4"><code class="text-emerald-400 font-mono bg-emerald-400/5 px-2 py-1 rounded border border-emerald-400/10">${fullPath}</code></td>
+                    </tr>`;
+            });
+        };
+
+        function createMonitorUI(w, val) {
+            let inner = '';
+            if(w.type === 'switch') {
+                // MODIFIKASI: Menambahkan onclick="toggleSwitch"
+                inner = `<div onclick="toggleSwitch('${w.slug}', ${val})" class="mt-5 flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 cursor-pointer transition">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">${val == 1 ? 'ON' : 'OFF'}</span>
+                            <div class="w-10 h-5 ${val == 1 ? 'bg-indigo-600' : 'bg-slate-700'} rounded-full relative p-1 transition-all">
+                                <div class="w-3 h-3 bg-white rounded-full transition-all transform ${val == 1 ? 'translate-x-5' : ''}"></div>
+                            </div></div>`;
+            } else if (w.type === 'numeric_gauge') {
+                const percent = Math.min(Math.max(((val - w.min) / (w.max - w.min)) * 100, 0), 100);
+                const circleLen = 226; // 2 * PI * r (r=36)
+                const offset = circleLen - (percent / 100 * circleLen);
+                inner = `
+                <div class="mt-4 flex flex-col items-center justify-center relative h-32">
+                    <svg class="w-24 h-24 transform -rotate-90">
+                        <circle cx="48" cy="48" r="36" stroke="currentColor" stroke-width="6" fill="transparent" class="text-slate-800" />
+                        <circle cx="48" cy="48" r="36" stroke="currentColor" stroke-width="7" fill="transparent" 
+                                stroke-dasharray="${circleLen}" stroke-dashoffset="${offset}" stroke-linecap="round" class="text-indigo-500 transition-all duration-1000" />
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-black text-white leading-none">${val}</span>
+                        <span class="text-[7px] font-bold text-slate-500 uppercase mt-1">${w.min} - ${w.max}</span>
+                    </div>
+                </div>`;
+            } else if (w.type === 'numeric_simple') {
+                inner = `<div class="mt-3 flex items-baseline"><span class="text-3xl font-black text-white">${val}</span><span class="ml-2 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Units</span></div>`;
+            } else if (w.type === 'status') {
+                inner = `<div class="mt-4 flex items-center space-x-3 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                         <div class="w-2.5 h-2.5 rounded-full ${val == 1 ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-slate-700'}"></div>
+                         <span class="text-[10px] font-mono text-slate-500 uppercase">${val == 1 ? 'Active / High' : 'Inactive / Low'}</span></div>`;
+            } else if (w.type === 'button') {
+                inner = `<button class="w-full mt-4 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-600/20 rounded-xl text-[10px] font-black transition uppercase tracking-widest">Trigger Sinyal</button>`;
+            }
+
+            return `
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                    <div class="text-[9px] text-slate-600 uppercase font-black tracking-[0.2em] mb-1">${w.type}</div>
+                    <div class="text-sm font-bold text-slate-200 truncate">${w.name}</div>
+                    ${inner}
+                </div>`;
+        }
+
         window.switchTab = (tab) => {
-            ['editor', 'monitor', 'connection'].forEach(s => document.getElementById('section-'+s).classList.add('hidden'));
-            ['editor', 'monitor', 'connection'].forEach(b => document.getElementById('btn-'+b).classList.remove('active', 'text-white'));
-            document.getElementById('section-'+tab).classList.remove('hidden');
-            document.getElementById('btn-'+tab).classList.add('active', 'text-white');
-            document.getElementById('header-title').innerText = tab.toUpperCase();
+            ['section-editor', 'section-monitor', 'section-connection'].forEach(s => document.getElementById(s).classList.add('hidden'));
+            ['btn-editor', 'btn-monitor', 'btn-connection'].forEach(b => document.getElementById(b).classList.remove('active', 'text-white'));
+            document.getElementById(`section-${tab}`).classList.remove('hidden');
+            document.getElementById(`btn-${tab}`).classList.add('active', 'text-white');
+            const titles = { editor: "Dashboard Editor", monitor: "Display & Control", connection: "System Connection" };
+            document.getElementById('header-title').innerText = titles[tab];
         };
 
         window.copyToClipboard = (text) => {
             navigator.clipboard.writeText(text);
-            alert("Path Copied!");
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-10 right-10 bg-indigo-600 text-white px-6 py-3 rounded-xl text-xs font-bold shadow-2xl z-[100] animate-bounce";
+            toast.innerText = "COPIED TO CLIPBOARD!";
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
         };
-
-        onValue(widgetsRef, (snapshot) => {
-            localWidgets = snapshot.val() ? Object.values(snapshot.val()) : [];
-            renderUI();
-        });
-
-        function createMonitorComponent(w) {
-            let content = '';
-            if(w.type === 'switch') {
-                content = `<div class="mt-5 flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                            <span class="text-[10px] font-bold text-slate-500">Status</span>
-                            <div class="w-10 h-5 bg-slate-700 rounded-full relative p-1 cursor-not-allowed"><div class="w-3 h-3 bg-white rounded-full"></div></div>
-                           </div>`;
-            } else if (w.type === 'numeric_gauge') {
-                // Fix Offset: 251.2 adalah keliling penuh (0%). 
-                // Karena data sekarang 0, kita set offset ke 251.2
-                content = `
-                <div class="mt-4 flex flex-col items-center justify-center relative h-32 w-full">
-                    <svg class="w-24 h-24 transform -rotate-90">
-                        <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="6" fill="transparent" class="text-slate-800" />
-                        <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="7" fill="transparent" 
-                                stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round" class="text-indigo-500 transition-all duration-1000" />
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-xl font-black text-white leading-none">0</span>
-                        <span class="text-[7px] font-bold text-slate-500 uppercase mt-1">${w.min} - ${w.max}</span>
-                    </div>
-                </div>`;
-            } else {
-                content = `<div class="mt-3 text-3xl font-black text-white">0</div>`;
-            }
-
-            return `<div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-                        <div class="text-[9px] text-slate-600 uppercase font-black mb-1">${w.type}</div>
-                        <div class="text-sm font-bold text-slate-200 truncate">${w.name}</div>
-                        ${content}
-                    </div>`;
-        }
-
-        function renderUI() {
-            const editor = document.getElementById('section-editor');
-            const monitor = document.getElementById('section-monitor');
-            const recap = document.getElementById('recap-table-body');
-            editor.innerHTML = ''; monitor.innerHTML = ''; recap.innerHTML = '';
-
-            localWidgets.forEach(w => {
-                const path = `/data/${w.slug}`;
-                editor.innerHTML += `
-                    <div class="bg-slate-800/30 border border-slate-700/50 p-6 rounded-2xl shadow-lg">
-                        <div class="flex justify-between items-start mb-4">
-                            <div><div class="text-[9px] text-indigo-400 font-bold uppercase mb-1">${w.type}</div><div class="font-bold text-white">${w.name}</div></div>
-                            <button onclick="window.deleteWidget(${w.id})" class="text-slate-600 hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
-                            <code class="text-[10px] text-emerald-500 truncate">${path}</code>
-                            <button onclick="window.copyToClipboard('${path}')" class="text-slate-700 hover:text-white"><i class="far fa-copy text-xs"></i></button>
-                        </div>
-                    </div>`;
-                monitor.innerHTML += createMonitorComponent(w);
-                recap.innerHTML += `<tr class="border-t border-slate-800"><td class="py-4 text-slate-300 font-bold">${w.name}</td><td class="py-4 text-slate-500 uppercase text-[9px] font-bold">${w.min}-${w.max}</td><td class="py-4 text-emerald-500 font-mono font-bold">${path}</td></tr>`;
-            });
-        }
     </script>
 </body>
 </html>

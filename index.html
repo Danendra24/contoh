@@ -250,38 +250,27 @@
         };
 
         window.deleteProject = (id) => {
-            if(confirm("Hapus project ini dan SEMUA widget di dalamnya?")) {
-                remove(ref(db, 'system_projects/' + id));
+            const proj = window.projects.find(p => p.id == id);
+            if(confirm(`Hapus project "${proj.name}"? Ini akan menghapus SEMUA widget dan DATA di dalamnya!`)) {
+                // 1. Hapus Folder Data Project (data/[slug])
+                remove(ref(db, `data/${proj.slug}`));
+                
+                // 2. Cari semua widget milik project ini untuk dihapus dari metadata
                 window.widgets.filter(w => w.projectId == id).forEach(w => {
                     remove(ref(db, 'system_widgets/' + w.id));
                 });
-                if(window.activeProjectId == id) window.activeProjectId = null;
+
+                // 3. Hapus Metadata Project
+                remove(ref(db, 'system_projects/' + id));
+                
+                if(window.activeProjectId == id) {
+                    window.activeProjectId = null;
+                    document.getElementById('active-project-name').innerText = "No Project Selected";
+                    document.getElementById('btn-create-widget').disabled = true;
+                    document.getElementById('btn-create-widget').classList.add('opacity-50', 'cursor-not-allowed');
+                }
             }
         };
-
-        function renderProjects() {
-            const container = document.getElementById('project-list');
-            container.innerHTML = '';
-            window.projects.forEach(p => {
-                const isActive = window.activeProjectId == p.id;
-                container.innerHTML += `
-                    <div onclick="selectProject(${p.id})" class="group flex items-center justify-between p-3 rounded-xl border border-slate-800 cursor-pointer transition ${isActive ? 'bg-indigo-600/20 border-indigo-500' : 'hover:bg-slate-900'}">
-                        <div class="flex items-center space-x-3 overflow-hidden">
-                            <i class="fas fa-folder text-xs ${isActive ? 'text-indigo-400' : 'text-slate-600'}"></i>
-                            <span class="text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-slate-400'}">${p.name}</span>
-                        </div>
-                        <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100">
-                            <button onclick="event.stopPropagation(); openProjectModal(${p.id})" class="text-slate-700 hover:text-emerald-500 transition">
-                                <i class="fas fa-edit text-[10px]"></i>
-                            </button>
-                            <button onclick="event.stopPropagation(); deleteProject(${p.id})" class="text-slate-700 hover:text-red-500 transition">
-                                <i class="fas fa-times text-[10px]"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-        }
 
         // WIDGET LOGIC
         window.openModal = (id = null) => {
@@ -326,14 +315,23 @@
                 const id = Date.now();
                 const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Math.floor(1000 + Math.random() * 9000);
                 const newWidget = { id, projectId: window.activeProjectId, projectSlug: proj.slug, name, type, min, max, slug };
+                
+                // Simpan metadata widget
                 set(ref(db, 'system_widgets/' + id), newWidget);
+                // Simpan data awal di dalam folder project (data/[proj_slug]/[widget_slug])
                 set(ref(db, `data/${proj.slug}/${slug}`), 0); 
             }
             closeModal();
         };
 
         window.deleteWidget = (id) => {
-            if(confirm("Hapus widget ini?")) remove(ref(db, 'system_widgets/' + id));
+            const w = window.widgets.find(item => item.id == id);
+            if(confirm(`Hapus widget "${w.name}"? Data di Firebase juga akan dihapus.`)) {
+                // Hapus data fisik di folder project
+                remove(ref(db, `data/${w.projectSlug}/${w.slug}`));
+                // Hapus metadata widget
+                remove(ref(db, 'system_widgets/' + id));
+            }
         };
 
         window.renderAll = () => {
